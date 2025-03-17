@@ -1,7 +1,10 @@
 # secure-trans-pad
-**This tool is still experimental**
+***This tool is still experimental!***
 
-Secure local transcription and translation tool with output to CryptPad
+Secure local transcription and translation tool using Faster Whisper with output to CryptPad
+
+## Requirements
+Install [uv](https://docs.astral.sh/uv/) and git clone this repo.
 
 ## Usage
 ### Translate to English
