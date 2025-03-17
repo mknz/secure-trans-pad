@@ -25,7 +25,7 @@ FORMAT = pyaudio.paInt16
 CHANNELS = 1
 RATE = 16000
 CHUNK = 1024 * 4  # Larger chunk for better transcription
-SILENCE_THRESHOLD = 300
+SILENCE_THRESHOLD_MEAN = 1000
 
 
 # Initialize Whisper model
@@ -85,14 +85,14 @@ def transcribe_audio(task, lang):
 def audio_callback(in_data, frame_count, time_info, status):
     # Check if audio contains speech (simple amplitude threshold)
     audio_data = np.frombuffer(in_data, dtype=np.int16)
-    if np.abs(audio_data).mean() > SILENCE_THRESHOLD:
+    if (np.abs(audio_data).mean() > SILENCE_THRESHOLD_MEAN):
         audio_buffer.append(in_data)
     return (in_data, pyaudio.paContinue)
 
 
 def main():
     parser = argparse.ArgumentParser()
-    parser.add_argument("--url")
+    parser.add_argument("--url", default=None)
     parser.add_argument("--task", default="transcribe")
     parser.add_argument("--lang", default=None)
 
@@ -115,43 +115,52 @@ def main():
     stream.start_stream()
     print("Recording started. Speak into the microphone.")
 
-    # Initialize Playwright and browser
-    with sync_playwright() as playwright:
-        browser = playwright.chromium.launch(headless=False)
-        page = browser.new_page()
+    if url:
+        # Initialize Playwright and browser
+        with sync_playwright() as playwright:
+            browser = playwright.chromium.launch(headless=False)
+            page = browser.new_page()
 
-        page.goto(url)
-        (
-            page.locator("#sbox-iframe")
-            .content_frame.locator('iframe[title="Editor\\, editor1"]')
-            .content_frame.locator("html")
-            .click()
-        )
+            page.goto(url)
+            (
+                page.locator("#sbox-iframe")
+                .content_frame.locator('iframe[title="Editor\\, editor1"]')
+                .content_frame.locator("html")
+                .click()
+            )
+            # Create a stream to process transcriptions
+            try:
+                for text in transcribe_audio(task, lang):
+                    # Update the webpage with the transcribed text
+                    elem = (
+                        page.locator("#sbox-iframe")
+                        .content_frame.locator('iframe[title="Editor\\, editor1"]')
+                        .content_frame.locator("html")
+                    )
+                    elem.evaluate(
+                        f"""
+                        let body = document.querySelector("body");
+                        let p = document.createElement("p");
+                        p.textContent = "{text}";
+                        body.appendChild(p);
+                    """
+                    )
+                    print(f"Transcribed: {text}")
+            except KeyboardInterrupt:
+                print("Recording stopped.")
+
+    else:
         # Create a stream to process transcriptions
         try:
             for text in transcribe_audio(task, lang):
-                # Update the webpage with the transcribed text
-                elem = (
-                    page.locator("#sbox-iframe")
-                    .content_frame.locator('iframe[title="Editor\\, editor1"]')
-                    .content_frame.locator("html")
-                )
-                elem.evaluate(
-                    f"""
-                    let body = document.querySelector("body");
-                    let p = document.createElement("p");
-                    p.textContent = "{text}";
-                    body.appendChild(p);
-                """
-                )
                 print(f"Transcribed: {text}")
         except KeyboardInterrupt:
             print("Recording stopped.")
 
-        # Cleanup
-        stream.stop_stream()
-        stream.close()
-        p.terminate()
+    # Cleanup
+    stream.stop_stream()
+    stream.close()
+    p.terminate()
 
 
 if __name__ == "__main__":

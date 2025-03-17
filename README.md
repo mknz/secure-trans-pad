@@ -19,5 +19,9 @@ uv run main.py --url CRYPTPAD_URL --task transcribe
 ```
 uv run main.py --url CRYPTPAD_URL --lang de
 ```
+### Output the text only to the console
+```
+uv run main.py
+```
 
 Consider making a donation to [CryptPad](https://cryptpad.fr/)!
