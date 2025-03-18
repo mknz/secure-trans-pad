@@ -8,7 +8,9 @@
 # ]
 # ///
 import argparse
+import datetime
 import os
+import shutil
 import tempfile
 import time
 import wave
@@ -25,7 +27,7 @@ FORMAT = pyaudio.paInt16
 CHANNELS = 1
 RATE = 16000
 CHUNK = 1024 * 4  # Larger chunk for better transcription
-SILENCE_THRESHOLD_MEAN = 1000
+SILENCE_THRESHOLD_MEAN = 300
 
 
 # Initialize Whisper model
@@ -35,7 +37,7 @@ model = WhisperModel("large", device="cpu", compute_type="int8")
 audio_buffer = []
 
 
-def transcribe_audio(task, lang):
+def transcribe_audio(task, lang, keep):
     global audio_buffer
 
     temp_dir = tempfile.gettempdir()
@@ -70,9 +72,13 @@ def transcribe_audio(task, lang):
 
             # Clean up
             try:
-                os.remove(temp_file)
+                if keep:
+                    fn = f'{datetime.datetime.now().isoformat()}.wav'
+                    shutil.move(temp_file, fn)
+                else:
+                    os.remove(temp_file)
             except Exception:
-                print("failed to remove tmp file")
+                print("failed to move or remove tmp file")
 
             if text.strip():
                 # Return text to be written to webpage
@@ -95,11 +101,13 @@ def main():
     parser.add_argument("--url", default=None)
     parser.add_argument("--task", default="transcribe")
     parser.add_argument("--lang", default=None)
+    parser.add_argument("--keep", action="store_true")
 
     args = parser.parse_args()
     url = args.url
     task = args.task
     lang = args.lang
+    keep = args.keep
 
     # Start audio recording
     p = pyaudio.PyAudio()
@@ -130,7 +138,7 @@ def main():
             )
             # Create a stream to process transcriptions
             try:
-                for text in transcribe_audio(task, lang):
+                for text in transcribe_audio(task, lang, keep):
                     # Update the webpage with the transcribed text
                     elem = (
                         page.locator("#sbox-iframe")
@@ -152,7 +160,7 @@ def main():
     else:
         # Create a stream to process transcriptions
         try:
-            for text in transcribe_audio(task, lang):
+            for text in transcribe_audio(task, lang, keep):
                 print(f"Transcribed: {text}")
         except KeyboardInterrupt:
             print("Recording stopped.")
