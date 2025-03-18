@@ -68,7 +68,12 @@ def transcribe_audio(task, lang, keep):
             )
 
             # Get transcription text
-            text = " ".join([segment.text for segment in segments])
+            result = []
+            for segment in segments:
+                # Crude VAD
+                if segment.no_speech_prob < 0.5:
+                    result.append(segment.text)
+            text = ' '.join(result)
 
             # Clean up
             try:
