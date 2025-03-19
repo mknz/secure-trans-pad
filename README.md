@@ -1,7 +1,7 @@
 # secure-trans-pad
-***This tool is still experimental!***
+**This tool is still experimental!**
 
-Secure local transcription and translation tool using Faster Whisper with output to CryptPad
+Secure local transcription and translation tool using [Faster Whisper](https://github.com/SYSTRAN/faster-whisper) with output to CryptPad or to the console
 
 ## Requirements
 Install [uv](https://docs.astral.sh/uv/) and git clone this repo.
@@ -28,6 +28,5 @@ uv run main.py
 ```
 uv run main.py --model medium
 ```
-
 
 Consider making a donation to [CryptPad](https://cryptpad.fr/)!
