@@ -19,6 +19,7 @@ import numpy as np
 import pyaudio
 
 from faster_whisper import WhisperModel
+from faster_whisper.utils import available_models
 from playwright.sync_api import sync_playwright
 
 
@@ -30,14 +31,11 @@ CHUNK = 1024 * 4  # Larger chunk for better transcription
 SILENCE_THRESHOLD_MEAN = 300
 
 
-# Initialize Whisper model
-model = WhisperModel("large", device="cpu", compute_type="int8")
-
 # Buffer for audio data
 audio_buffer = []
 
 
-def transcribe_audio(task, lang, keep):
+def transcribe_audio(task, lang, keep, model):
     global audio_buffer
 
     temp_dir = tempfile.gettempdir()
@@ -107,12 +105,20 @@ def main():
     parser.add_argument("--task", default="transcribe")
     parser.add_argument("--lang", default=None)
     parser.add_argument("--keep", action="store_true")
+    parser.add_argument(
+        "--model",
+        choices=available_models(),
+        default="large",
+    )
 
     args = parser.parse_args()
     url = args.url
     task = args.task
     lang = args.lang
     keep = args.keep
+
+    # Initialize Whisper model
+    model = WhisperModel(args.model, device="cpu", compute_type="int8")
 
     # Start audio recording
     p = pyaudio.PyAudio()
@@ -143,7 +149,7 @@ def main():
             )
             # Create a stream to process transcriptions
             try:
-                for text in transcribe_audio(task, lang, keep):
+                for text in transcribe_audio(task, lang, keep, model):
                     # Update the webpage with the transcribed text
                     elem = (
                         page.locator("#sbox-iframe")
@@ -165,7 +171,7 @@ def main():
     else:
         # Create a stream to process transcriptions
         try:
-            for text in transcribe_audio(task, lang, keep):
+            for text in transcribe_audio(task, lang, keep, model):
                 print(f"Transcribed: {text}")
         except KeyboardInterrupt:
             print("Recording stopped.")
