@@ -24,4 +24,10 @@ uv run main.py --url CRYPTPAD_URL --lang de
 uv run main.py
 ```
 
+### Choose model type (default is large)
+```
+uv run main.py --model medium
+```
+
+
 Consider making a donation to [CryptPad](https://cryptpad.fr/)!
