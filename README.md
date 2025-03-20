@@ -27,7 +27,7 @@ uv run main.py
 ```
 uv run main.py --model medium
 ```
-### Translate the text using llm
+### Translate the text using [llm](https://github.com/simonw/llm)
 ```
 uv run main.py --mode translate-llm \
                --model-translate gemma3:1b \
