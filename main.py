@@ -9,6 +9,7 @@
 #     "pyaudio",
 # ]
 # ///
+import asyncio
 import argparse
 import datetime
 import os
@@ -36,16 +37,36 @@ SILENCE_THRESHOLD_MEAN = 300
 
 # Buffer for audio data
 audio_buffer = []
+transcript_buffer = []
 
 
-def translate(text: str, model) -> str:
+async def translate(args) -> str:
     """Translate the text using LLM"""
-    # Initialize LLM related objects
-    prompt_text = f'以下の文字起こしされたテキストを日本語に翻訳してください。原文の意味を保ちつつ自然な日本語に翻訳し、また訳抜けがないように留意してください。フィラーワードがあれば除き、読みやすい文章にしてください。文中に出てくる数字については半角で統一してください。説明なしで結果のみを出力すること。\n---\n{text}'
-    return model.prompt(prompt_text).text()
+    last_index = 0
+
+    if args.mode == 'translate-llm':
+        model = llm.get_async_model(args.model_translate)
+        with open(args.translation_prompt, 'r') as f:
+            prompt = f.read()
+
+        while True:
+            if last_index < len(transcript_buffer):
+                text = transcript_buffer[-1]
+                prompt_text = f'{prompt}\n---\n{text}'
+                output = await model.prompt(prompt_text).text()
+                print(f'Translated: {output}')
+                last_index += 1
+            await asyncio.sleep(0.1)
+    elif args.mode == 'translate-whisper':
+        while True:
+            if last_index < len(transcript_buffer):
+                text = transcript_buffer[-1]
+                print(f'Translated: {text}')
+                last_index += 1
+            await asyncio.sleep(0.1)
 
 
-def transcribe_audio(task, lang, keep, model, model_translate):
+async def transcribe_audio(task, lang, keep, model):
     global audio_buffer
 
     temp_dir = tempfile.gettempdir()
@@ -83,9 +104,6 @@ def transcribe_audio(task, lang, keep, model, model_translate):
                     result.append(segment.text)
             text = ' '.join(result)
 
-            # Translate
-            text = translate(text, model_translate)
-
             # Clean up
             try:
                 if keep:
@@ -101,8 +119,8 @@ def transcribe_audio(task, lang, keep, model, model_translate):
                 yield text
 
         # Wait a bit to not overwhelm the system
-        time.sleep(0.1)
-        print(len(audio_buffer))
+        await asyncio.sleep(0.1)
+        print(len(audio_buffer), len(transcript_buffer))
 
 
 def audio_callback(in_data, frame_count, time_info, status):
@@ -113,32 +131,19 @@ def audio_callback(in_data, frame_count, time_info, status):
     return (in_data, pyaudio.paContinue)
 
 
-def main():
-    parser = argparse.ArgumentParser()
-    parser.add_argument("--url", default=None)
-    parser.add_argument(
-        "--task",
-        choices=['translate', 'transcribe'],
-        default="transcribe",
-    )
-    parser.add_argument("--lang", default=None)
-    parser.add_argument("--keep", action="store_true")
-    parser.add_argument(
-        "--model",
-        choices=available_models(),
-        default="large",
-    )
-    parser.add_argument("--model-translate")
-
-    args = parser.parse_args()
+async def transcribe(args):
     url = args.url
-    task = args.task
+    if args.mode == 'translate-whisper':
+        task = 'translate'
+    elif args.mode in ['transcribe', 'translate-llm']:
+        task = 'transcribe'
+
     lang = args.lang
     keep = args.keep
-    model_translate = llm.get_model(args.model_translate)
 
     # Initialize Whisper model
     model = WhisperModel(args.model, device="cpu", compute_type="int8")
+
 
     # Start audio recording
     p = pyaudio.PyAudio()
@@ -169,7 +174,7 @@ def main():
             )
             # Create a stream to process transcriptions
             try:
-                for text in transcribe_audio(task, lang, keep, model, model_translate):
+                async for text in transcribe_audio(task, lang, keep, model):
                     # Update the webpage with the transcribed text
                     elem = (
                         page.locator("#sbox-iframe")
@@ -184,15 +189,19 @@ def main():
                         body.appendChild(p);
                     """
                     )
-                    print(f"Transcribed: {text}")
+                    if args.mode != 'translate-whisper':
+                        print(f"Transcribed: {text}")
+                    transcript_buffer.append(text)
             except KeyboardInterrupt:
                 print("Recording stopped.")
 
     else:
         # Create a stream to process transcriptions
         try:
-            for text in transcribe_audio(task, lang, keep, model, model_translate):
-                print(f"Transcribed: {text}")
+            async for text in transcribe_audio(task, lang, keep, model):
+                if args.mode != 'translate-whisper':
+                    print(f"Transcribed: {text}")
+                transcript_buffer.append(text)
         except KeyboardInterrupt:
             print("Recording stopped.")
 
@@ -202,5 +211,31 @@ def main():
     p.terminate()
 
 
+async def main():
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--url", default=None)
+    parser.add_argument(
+        "--mode",
+        choices=['transcribe', 'translate-whisper', 'translate-llm'],
+        default="transcribe",
+    )
+    parser.add_argument("--lang", default=None)
+    parser.add_argument("--keep", action="store_true")
+    parser.add_argument(
+        "--model",
+        choices=available_models(),
+        default="large",
+    )
+    parser.add_argument("--model-translate", default=None)
+    parser.add_argument("--translation-prompt", default=None)
+
+    args = parser.parse_args()
+
+    await asyncio.gather(
+        transcribe(args),
+        translate(args),
+    )
+
+
 if __name__ == "__main__":
-    main()
+    asyncio.run(main())
