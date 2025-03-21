@@ -36,6 +36,7 @@ class TranscriptionService:
     RATE = 16000
     CHUNK = 1024 * 4  # Larger chunk for better transcription
     SILENCE_THRESHOLD_MEAN = 300
+    TRUNC_AUDIO_BUFFER = 60  # Avoid too much lagging
 
     def __init__(self, args):
         self.args = args
@@ -79,7 +80,16 @@ class TranscriptionService:
         while self.running:
             if len(self.audio_buffer) > 0:
                 # Copy and clear the buffer
-                current_buffer = self.audio_buffer.copy()
+                if len(self.audio_buffer) > self.TRUNC_AUDIO_BUFFER:
+                    current_buffer = (
+                        self.audio_buffer[:self.TRUNC_AUDIO_BUFFER]
+                        .copy()
+                    )
+                    is_trunc = True
+                else:
+                    current_buffer = self.audio_buffer.copy()
+                    is_trunc = False
+
                 self.audio_buffer = []
 
                 # Save buffer to temp WAV file
@@ -116,6 +126,8 @@ class TranscriptionService:
                         result.append(segment.text)
 
                 text = " ".join(result)
+                if is_trunc:
+                    text += ' (truncated)'
 
                 # Clean up
                 try:
