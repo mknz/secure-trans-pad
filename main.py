@@ -47,6 +47,8 @@ class TranscriptionService:
         self.p_audio = None
         self.model = None
         self.temp_dir = tempfile.gettempdir()
+        # Add timestamp tracking for delay calculation
+        self.segment_timestamps = {}
 
         # Set up signal handling for graceful exit
         signal.signal(signal.SIGINT, self.handle_exit)
@@ -79,6 +81,9 @@ class TranscriptionService:
         """Process audio buffer and transcribe content"""
         while self.running:
             if len(self.audio_buffer) > 0:
+                # Record start time for delay calculation
+                start_time = time.time()
+
                 # Copy and clear the buffer
                 if len(self.audio_buffer) > self.TRUNC_AUDIO_BUFFER:
                     current_buffer = (
@@ -93,9 +98,10 @@ class TranscriptionService:
                 self.audio_buffer = []
 
                 # Save buffer to temp WAV file
+                timestamp = time.time()
                 temp_file = os.path.join(
                     self.temp_dir,
-                    f"segment_{time.time()}.wav",
+                    f"segment_{timestamp}.wav",
                 )
                 with wave.open(temp_file, "wb") as wf:
                     wf.setnchannels(self.CHANNELS)
@@ -129,6 +135,18 @@ class TranscriptionService:
                 if is_trunc:
                     text += ' (truncated)'
 
+                # Calculate and display delay
+                end_time = time.time()
+                delay = end_time - start_time
+                segment_id = len(self.transcript_buffer)
+                self.segment_timestamps[segment_id] = {
+                    "start": start_time,
+                    "end": end_time,
+                    "delay": delay
+                }
+
+                text_with_delay = f"{text} [Delay: {delay:.2f}s]"
+
                 # Clean up
                 try:
                     if self.args.keep:
@@ -142,7 +160,10 @@ class TranscriptionService:
                 if text.strip():
                     # Add to transcript buffer and yield
                     self.transcript_buffer.append(text)
-                    yield text
+                    if self.args.show_delay:
+                        yield text_with_delay
+                    else:
+                        yield text
 
             # Status update
             print(
@@ -163,9 +184,23 @@ class TranscriptionService:
             while self.running:
                 if last_index < len(self.transcript_buffer):
                     text = self.transcript_buffer[last_index]
+                    # Get delay info for this segment
+                    delay_info = ""
+                    if last_index in self.segment_timestamps:
+                        delay = self.segment_timestamps[last_index]["delay"]
+                        delay_info = f" [Delay: {delay:.2f}s]"
+
                     prompt_text = f"{prompt}\n---\n{text}"
+                    translation_start = time.time()
                     output = await model.prompt(prompt_text).text()
-                    print(f"\nTranslated: {output}")
+                    translation_end = time.time()
+                    translation_delay = translation_end - translation_start
+
+                    if self.args.show_delay:
+                        print(f"\nTranslated: {output}{delay_info} [Translation delay: {translation_delay:.2f}s]")
+                    else:
+                        print(f"\nTranslated: {output}")
+
                     last_index += 1
                 await asyncio.sleep(0.1)
 
@@ -173,7 +208,17 @@ class TranscriptionService:
             while self.running:
                 if last_index < len(self.transcript_buffer):
                     text = self.transcript_buffer[last_index]
-                    print(f"\nTranslated: {text}")
+                    # Get delay info for this segment
+                    delay_info = ""
+                    if last_index in self.segment_timestamps:
+                        delay = self.segment_timestamps[last_index]["delay"]
+                        delay_info = f" [Delay: {delay:.2f}s]"
+
+                    if self.args.show_delay:
+                        print(f"\nTranslated: {text}{delay_info}")
+                    else:
+                        print(f"\nTranslated: {text}")
+
                     last_index += 1
                 await asyncio.sleep(0.1)
 
@@ -266,19 +311,30 @@ async def main():
     )
     parser.add_argument("--lang", default=None)
     parser.add_argument(
-        "--keep", action="store_true", help="Keep temporary audio files"
-    )
-    parser.add_argument(
         "--model",
         choices=available_models(),
         default="large",
         help="Whisper models to use",
     )
     parser.add_argument(
-        "--model-translate", default=None, help="LLM model id for translation"
+        "--model-translate",
+        default=None,
+        help="LLM model id for translation",
     )
     parser.add_argument(
-        "--translation-prompt", default=None, help="Path to translation prompt file"
+        "--translation-prompt",
+        default=None,
+        help="Path to translation prompt file",
+    )
+    parser.add_argument(
+        "--keep",
+        action="store_true",
+        help="Keep temporary audio files",
+    )
+    parser.add_argument(
+        "--show-delay",
+        action="store_true",
+        help="Show delay in the processing",
     )
 
     args = parser.parse_args()
