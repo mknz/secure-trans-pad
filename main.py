@@ -281,7 +281,7 @@ class TranscriptionService:
                     async for text in self.transcribe_audio():
                         # Update webpage and print progress
                         await self.update_webpage(page, text)
-                        if self.args.mode != "translate-whisper":
+                        if self.args.mode == "transcribe":
                             print(f"\nTranscribed: {text}")
                 except Exception as e:
                     print(f"\nError: {e}")
@@ -292,7 +292,7 @@ class TranscriptionService:
             # Console-only mode
             try:
                 async for text in self.transcribe_audio():
-                    if self.args.mode != "translate-whisper":
+                    if self.args.mode == "transcribe":
                         print(f"\nTranscribed: {text}")
             except Exception as e:
                 print(f"\nError: {e}")
