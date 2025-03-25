@@ -33,5 +33,13 @@ uv run main.py --mode translate-llm \
                --model-translate gemma3:1b \
                --translation-prompt prompt_de.txt
 ```
+### Keep audio files
+```
+uv run main.py --keep
+```
+### Show delay
+```
+uv run main.py --show-delay
+```
 
 Consider making a donation to [CryptPad](https://cryptpad.fr/)!
