@@ -34,7 +34,7 @@ class TranscriptionService:
     FORMAT = pyaudio.paInt16
     CHANNELS = 1
     RATE = 16000
-    CHUNK = 1024 * 4  # Larger chunk for better transcription
+    CHUNK = 1024 * 128  # Larger chunk for better transcription
     SILENCE_THRESHOLD_MEAN = 300
     TRUNC_AUDIO_BUFFER = 60  # Avoid too much lagging
 
