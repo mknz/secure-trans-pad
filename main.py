@@ -313,7 +313,7 @@ async def main():
     parser.add_argument(
         "--model",
         choices=available_models(),
-        default="large",
+        default="small",
         help="Whisper models to use",
     )
     parser.add_argument(
