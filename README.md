@@ -42,4 +42,4 @@ uv run main.py --keep
 uv run main.py --show-delay
 ```
 
-Consider making a donation to [CryptPad](https://cryptpad.fr/)!
+Consider making a donation to [CryptPad](https://cryptpad.org)!
