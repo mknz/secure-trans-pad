@@ -4,6 +4,9 @@
 Secure local transcription and translation tool using [Faster Whisper](https://github.com/SYSTRAN/faster-whisper) with output to CryptPad or to the console
 
 ## Requirements
+```
+sudo apt-get install pulseaudio alsa-utils portaudio19-dev -y
+```
 Install [uv](https://docs.astral.sh/uv/) and git clone this repo.
 
 ## Usage
@@ -23,7 +26,7 @@ uv run main.py --url CRYPTPAD_URL --lang de
 ```
 uv run main.py
 ```
-### Choose model type (default is `large`)
+### Choose model type (default is `small`)
 ```
 uv run main.py --model medium
 ```
